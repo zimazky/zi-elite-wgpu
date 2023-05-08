@@ -1,3 +1,5 @@
+import { loadImg } from './loadimg';
+import { Material } from './material';
 import { rad } from './mathutils';
 import { Triangle } from './triangle';
 import { Mat4, Vec3 } from './vectors';
@@ -15,6 +17,8 @@ export class WebGPU {
   bindGroup: GPUBindGroup;
   renderPassDescriptor: GPURenderPassDescriptor;
   triangle: Triangle;
+  material: Material;
+  t: number = 0.;
 
   async initialize(canvas: HTMLCanvasElement) {
     this.gpu = navigator.gpu;
@@ -31,6 +35,9 @@ export class WebGPU {
     })
 
     this.triangle = new Triangle(this.device);
+    this.material = new Material();
+    const img = await loadImg('textures/cat-head.jpg');
+    this.material.initialize(this.device,img);
 
     this.uniformBuffer = this.device.createBuffer({
       size: 64*3,
@@ -38,11 +45,19 @@ export class WebGPU {
     });
 
     const bindGroupLayout = this.device.createBindGroupLayout({
-      entries: [{binding: 0, visibility: GPUShaderStage.VERTEX, buffer: {}}]
+      entries: [
+        {binding: 0, visibility: GPUShaderStage.VERTEX, buffer: {}},
+        {binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {}},
+        {binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: {}}
+      ]
     });
     this.bindGroup = this.device.createBindGroup({
       layout: bindGroupLayout,
-      entries: [{binding: 0, resource: {buffer: this.uniformBuffer}}]
+      entries: [
+        {binding: 0, resource: {buffer: this.uniformBuffer}},
+        {binding: 1, resource: this.material.view},
+        {binding: 2, resource: this.material.sampler}
+      ]
     });
     const pipelineLayout = this.device.createPipelineLayout({
       bindGroupLayouts: [bindGroupLayout]
@@ -78,18 +93,27 @@ export class WebGPU {
     } as GPURenderPassDescriptor;
   }
   
-  render() {
+  render = ()=>{
+    this.t += 0.01;
+
     const projection = Mat4.perspectiveDx(rad(45), 1, 0.01, 10);
-    const view = Mat4.lookAt(new Vec3(0.0,6.,-2.5), new Vec3(-0.,0.,-1.), Vec3.J());
-    const model = Mat4.rotateMat(Vec3.J(), rad(20));
+    const view = Mat4.lookAt(new Vec3(0.0,2.,2.5), new Vec3(-0.5,0.,0.), Vec3.J());
+    const model = Mat4.rotateMat(Vec3.J(), this.t);
 
     this.device.queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(model.getArray()));
     this.device.queue.writeBuffer(this.uniformBuffer, 64, new Float32Array(view.getArray()));
     this.device.queue.writeBuffer(this.uniformBuffer, 128, new Float32Array(projection.getArray()));
 
+    const textureView = this.context.getCurrentTexture().createView();
     const commandEncoder = this.device.createCommandEncoder();
-    //this.renderPassDescriptor.colorAttachments[0].view = this.context.getCurrentTexture().createView();
-    const renderpass = commandEncoder.beginRenderPass(this.renderPassDescriptor);
+    const renderpass = commandEncoder.beginRenderPass({
+      colorAttachments: [{
+        view: textureView,
+        clearValue: {r: 0.5, g: 0, b: 0.25, a: 1},
+        loadOp: 'clear',
+        storeOp: 'store'
+      }]
+    });
     renderpass.setPipeline(this.pipeline);
     renderpass.setBindGroup(0, this.bindGroup);
     renderpass.setVertexBuffer(0, this.triangle.buffer);
@@ -97,6 +121,8 @@ export class WebGPU {
     renderpass.end();
   
     this.device.queue.submit([commandEncoder.finish()]);
+
+    requestAnimationFrame(this.render);
   }
 /*
   const observer = new ResizeObserver(entries => {

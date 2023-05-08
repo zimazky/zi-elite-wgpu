@@ -79,9 +79,9 @@ export class WebGPU {
   }
   
   render() {
-    const projection = Mat4.perspectiveProjectMatrix(rad(45), 1, 0.01, 10);
-    const view = Mat4.lookAtMatrix(new Vec3(0.0,0.,2.5), new Vec3(0.5,0.,0.), Vec3.J());
-    const model = Mat4.rotateMatrix(Vec3.J(), rad(20));
+    const projection = Mat4.perspectiveDx(rad(45), 1, 0.01, 10);
+    const view = Mat4.lookAt(new Vec3(0.0,6.,-2.5), new Vec3(-0.,0.,-1.), Vec3.J());
+    const model = Mat4.rotateMat(Vec3.J(), rad(20));
 
     this.device.queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(model.getArray()));
     this.device.queue.writeBuffer(this.uniformBuffer, 64, new Float32Array(view.getArray()));

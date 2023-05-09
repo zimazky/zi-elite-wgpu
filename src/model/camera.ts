@@ -71,17 +71,19 @@ export class Camera {
     );
 
     this.transformPrev = this.transform.copy();
-    const transform1 = Mat4.lookAt(new Vec3(0,2,2), new Vec3(0.5,0,-0.5), Vec3.J());
-    this.transform = Mat4.cameraViewFromQuatPosition(this.orientation, this.position);
-    //console.log(transform1, this.transform);
 
-/*
     const rotMat = Mat3.fromQuat(this.orientation);
 
     // ускорение тяги
-    this.velocity.addMutable(rotMat.mulVec(acceleration).mulMutable(THRUST*timeDelta));
+    // ускорение переводим в глобальную систему координат, т.к. ускорение связано с системой координат камеры
+    //    v += a*MV
+    this.velocity.addMutable(rotMat.mulVecLeft(acceleration).mulMutable(THRUST*timeDelta));
     // замедление от сопротивления воздуха
-    this.velocity.subMutable(rotMat.mulVec(rotMat.mulVecLeft(this.velocity).mulElMutable(AIR_DRAG)).mulMutable(timeDelta) );
+    // коэффициенты сопротивления связаны с ориентацией корабля,
+    // поэтому скорость сначала переводим к системе координат камеры,
+    // а после домножения на коэфф сопр, возвращаем к глобальной системе
+    //    v -= (((MV*v)*AIR_DRAG)*MV)
+    this.velocity.subMutable(rotMat.mulVecLeft(rotMat.mulVec(this.velocity).mulElMutable(AIR_DRAG)).mulMutable(timeDelta));
     // гравитация
     this.velocity.y -= GRAVITATION*timeDelta;
     // экстренная остановка
@@ -94,9 +96,10 @@ export class Camera {
     // вычисление изменения положения камеры
     this.positionDelta = this.position.sub(this.positionDelta);
 
-    //this.transform = Mat4.fromRotTransl(rotMat, this.position);
-    this.transform = Mat4.lookAt(new Vec3(0,2,2), new Vec3(0.5,0,0), Vec3.J());
-    
+
+
+
+    this.transform = Mat4.cameraViewFromQuatPosition(this.orientation, this.position);
 
     // вращение
     const angularAcceleration = new Vec3(
@@ -109,16 +112,13 @@ export class Camera {
     // замедление вращения без клавиш
     this.angularSpeed.subMutable(this.angularSpeed.mul(3.*timeDelta));
     // изменение ориентации (поворот кватерниона)
-    const rotDelta = this.angularSpeed.mul(20.*timeDelta);
-    this.orientation = this.orientation.qmul(new Quaternion(0,0,Math.sin(rotDelta.z),Math.cos(rotDelta.z)));
-    this.orientation = this.orientation.qmul(new Quaternion(Math.sin(rotDelta.x),0,0,Math.cos(rotDelta.x)));
-    this.orientation = this.orientation.qmul(new Quaternion(0,Math.sin(rotDelta.y),0,Math.cos(rotDelta.y)));
-
+    const rotDelta = this.angularSpeed.mul(-20.*timeDelta);
+    this.orientation = Quaternion.fromYawPitchRoll(rotDelta.x, rotDelta.y, rotDelta.z).qmul(this.orientation);
     this.orientation.normalizeMutable();
 
     this.direction = this.orientation.rotate(new Vec3(0.,0.,-1.));
     this.fovy += 0.01*(isKeyDown(KEY_MINUS)-isKeyDown(KEY_PLUS));
-*/
+
     //console.log(this.orientation);
   }
 }

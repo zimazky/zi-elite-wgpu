@@ -1297,10 +1297,15 @@ export class Quaternion extends Vec4 {
    *  Pitch - поворот вокруг поперечной оси x (ось тангажа)
    *  Yaw - поворот вокруг вертикальной оси y (ось рысканья)
   */
-  static fromYawPitchRoll(yaw: number, pitch: number, roll: number): Quaternion {
+  static fromYawPitchRoll(pitch: number, yaw: number, roll: number): Quaternion {
+    return new Quaternion(0,Math.sin(yaw),0,Math.cos(yaw))
+      .qmul(new Quaternion(Math.sin(pitch),0,0,Math.cos(pitch))
+      .qmul(new Quaternion(0,0,Math.sin(roll),Math.cos(roll))))
+/*
     return  Quaternion.fromAxisAngle(Vec3.I(), pitch)
             .qmul(Quaternion.fromAxisAngle(Vec3.J(), yaw)
             .qmul(Quaternion.fromAxisAngle(Vec3.K(), roll)))
   }
-  
+  */
+  }
 }

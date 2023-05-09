@@ -1,9 +1,11 @@
-import { loadImg } from './loadimg';
+import { loadImg } from '../utils/loadimg';
 import { Material } from './material';
-import { rad } from './mathutils';
+import { toRad } from '../utils/mathutils';
 import { Triangle } from './triangle';
-import { Mat4, Vec3 } from './vectors';
+import { Mat4, Vec3 } from '../utils/vectors';
 import shader from '/src/shaders/shader.wgsl';
+import { Camera } from 'src/model/camera';
+import { ModelA } from 'src/model/modelA';
 
 export class WebGPU {
   private format: GPUTextureFormat = 'bgra8unorm';
@@ -18,7 +20,6 @@ export class WebGPU {
   renderPassDescriptor: GPURenderPassDescriptor;
   triangle: Triangle;
   material: Material;
-  t: number = 0.;
 
   async initialize(canvas: HTMLCanvasElement) {
     this.gpu = navigator.gpu;
@@ -93,14 +94,11 @@ export class WebGPU {
     } as GPURenderPassDescriptor;
   }
   
-  render = ()=>{
-    this.t += 0.01;
+  render = (camera: Camera, triangles: ModelA[])=>{
+    const projection = camera.projection.copy();
+    //const view = Mat4.lookAt(new Vec3(0,2,2), new Vec3(0.5,0,0), Vec3.J()) //camera.transform;
+    const view = camera.transform.copy();
 
-    const projection = Mat4.perspectiveDx(rad(45), 1, 0.01, 10);
-    const view = Mat4.lookAt(new Vec3(0.0,2.,2.5), new Vec3(-0.5,0.,0.), Vec3.J());
-    const model = Mat4.rotateMat(Vec3.J(), this.t);
-
-    this.device.queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(model.getArray()));
     this.device.queue.writeBuffer(this.uniformBuffer, 64, new Float32Array(view.getArray()));
     this.device.queue.writeBuffer(this.uniformBuffer, 128, new Float32Array(projection.getArray()));
 
@@ -115,14 +113,18 @@ export class WebGPU {
       }]
     });
     renderpass.setPipeline(this.pipeline);
-    renderpass.setBindGroup(0, this.bindGroup);
     renderpass.setVertexBuffer(0, this.triangle.buffer);
-    renderpass.draw(3, 1, 0, 0);
+
+    triangles.forEach(t=>{
+      const model = t.transform.copy();
+      this.device.queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(model.getArray()));
+      renderpass.setBindGroup(0, this.bindGroup);
+      renderpass.draw(3, 1, 0, 0);
+      //console.log(t);
+    })
     renderpass.end();
   
     this.device.queue.submit([commandEncoder.finish()]);
-
-    requestAnimationFrame(this.render);
   }
 /*
   const observer = new ResizeObserver(entries => {

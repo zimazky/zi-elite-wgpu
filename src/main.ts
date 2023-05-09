@@ -1,6 +1,6 @@
-import { WebGPU } from "./engine/webgpu";
+import { App } from "./control/app";
 
-const wg = new WebGPU;
-wg.initialize(<HTMLCanvasElement>document.getElementById('wgpucanvas'))
-.then(()=>wg.render());
+const canvas = <HTMLCanvasElement> document.getElementById('wgpucanvas');
+const app = new App(canvas);
+app.initialize().then(app.run);
 

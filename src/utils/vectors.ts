@@ -1,3 +1,15 @@
+/*!
+
+Модуль определения операций с векторами и матрицами 
+@author Andrey Zimatskiy
+@version 1.23.5
+
+
+Mat4.lookAt на тестах дает большое расхождение по сравнению с библиотекой gl-matrix
+Нужно проверить
+
+*/
+
 const EPSILON = 0.00001;
 
 interface IVectors<T> {
@@ -41,6 +53,8 @@ interface IVectors<T> {
   floor(): T;
   /** Вектор с дробными частями элементов */
   fract(): T;
+  /** Отрицательный вектор */
+  negate(): T;
   /** Получить компоненты в виде массива */
   getArray(): number[];
 }
@@ -169,6 +183,8 @@ export class Vec4 implements IVectors<Vec4> {
   }
 
   fract(): Vec4 { return this.copy().subMutable(this.floor()); }
+
+  negate(): Vec4 { return new Vec4(-this.x, -this.y, -this.z, -this.w); }
 
   getArray(): number[] { return [this.x, this.y, this.z, this.w]; }
 }
@@ -363,7 +379,7 @@ export class Mat4 implements IMatrixes<Mat4, Vec4> {
       new Vec4(0., 0., e14, 0.)
     );
   }
-  /**
+  /** Tested
    * Получить матрицу вида
    * @param from - точка наблюдения
    * @param to - точка направления взгляда
@@ -381,14 +397,13 @@ export class Mat4 implements IMatrixes<Mat4, Vec4> {
       new Vec4(-right.dot(from), -newup.dot(from), -forward.dot(from), 1.)
     );
   } 
-
   /**
    * Получить матрицу вращения
    * @param axis - ось вращения
    * @param theta - угол поворота
    * @returns 
    */
-  static rotateMat(axis: Vec3, theta: number): Mat4 {
+  static fromAxisAngle(axis: Vec3, theta: number): Mat4 {
     const a = axis.normalize();
     const c = Math.cos(theta);
     const mc = 1 - c;
@@ -399,7 +414,197 @@ export class Mat4 implements IMatrixes<Mat4, Vec4> {
       new Vec4(a.z*a.x*mc+a.y*s, a.z*a.y*mc-a.x*s, a.z*a.z*mc+c, 0),
       new Vec4(0, 0, 0, 1)
     );
-  } 
+  }
+  /** 
+   * Получить матрицу вращения из кватерниона
+   * @param q - кватернион, определяющий вращение
+   * */
+  static fromQuat(q: Quaternion): Mat4 {
+    const x2 = q.x + q.x;
+    const y2 = q.y + q.y;
+    const z2 = q.z + q.z;
+    const xx = q.x * x2;
+    const yx = q.y * x2;
+    const yy = q.y * y2;
+    const zx = q.z * x2;
+    const zy = q.z * y2;
+    const zz = q.z * z2;
+    const wx = q.w * x2;
+    const wy = q.w * y2;
+    const wz = q.w * z2;
+    return new Mat4(
+      new Vec4(1 - yy - zz, yx + wz, zx - wy, 0),
+      new Vec4(yx - wz, 1 - xx - zz, zy + wx, 0),
+      new Vec4(zx + wy, zy - wx, 1 - xx - yy, 0),
+      new Vec4(0, 0, 0, 1)
+    );
+  }
+  /** 
+   * Получить матрицу вида камеры по кватерниону и вектору положения
+   * @param q - кватернион, определяющий вращение
+   * @param p - положение камеры
+   * */
+  static cameraViewFromQuatPosition(q: Quaternion, p: Vec3): Mat4 {
+    const x2 = q.x + q.x;
+    const y2 = q.y + q.y;
+    const z2 = q.z + q.z;
+    const xx = q.x * x2;
+    const yx = q.y * x2;
+    const yy = q.y * y2;
+    const zx = q.z * x2;
+    const zy = q.z * y2;
+    const zz = q.z * z2;
+    const wx = q.w * x2;
+    const wy = q.w * y2;
+    const wz = q.w * z2;
+    const i = new Vec4(1 - yy - zz, yx + wz, zx - wy, 0);
+    const j = new Vec4(yx - wz, 1 - xx - zz, zy + wx, 0);
+    const k = new Vec4(zx + wy, zy - wx, 1 - xx - yy, 0);
+    const l = new Vec4(
+      - i.x*p.x - j.x*p.y - k.x*p.z,
+      - i.y*p.x - j.y*p.y - k.y*p.z,
+      - i.z*p.x - j.z*p.y - k.z*p.z,
+      1.
+    );
+    return new Mat4(i, j, k, l);
+  }
+  /** 
+   * Получить матрицу модели по кватерниону и вектору положения
+   * @param q - кватернион, определяющий вращение
+   * @param p - положение модели
+   * */
+  static modelFromQuatPosition(q: Quaternion, p: Vec3): Mat4 {
+    const x2 = q.x + q.x;
+    const y2 = q.y + q.y;
+    const z2 = q.z + q.z;
+    const xx = q.x * x2;
+    const yx = q.y * x2;
+    const yy = q.y * y2;
+    const zx = q.z * x2;
+    const zy = q.z * y2;
+    const zz = q.z * z2;
+    const wx = q.w * x2;
+    const wy = q.w * y2;
+    const wz = q.w * z2;
+    const i = new Vec4(1 - yy - zz, yx + wz, zx - wy, 0);
+    const j = new Vec4(yx - wz, 1 - xx - zz, zy + wx, 0);
+    const k = new Vec4(zx + wy, zy - wx, 1 - xx - yy, 0);
+    const l = new Vec4(p.x, p.y, p.z, 1.);
+    return new Mat4(i, j, k, l);
+  }
+  
+
+  /** Получить коэффициенты масштабирования из матрицы преобразования */
+  getScaling(): Vec3 {
+    return new Vec3(
+      Math.hypot(this.i.x, this.i.y, this.i.z),
+      Math.hypot(this.j.x, this.j.y, this.j.z), 
+      Math.hypot(this.k.x, this.k.y, this.k.z)
+    );
+  }
+
+  /** 
+   * Получить коэффициенты масштабирования из матрицы преобразования 
+   * НУЖНО ПРОТЕСТИРОВАТЬ
+  */
+  getRotation(): Mat3 {
+    return new Mat3(
+      new Vec3(this.i.x, this.i.y, this.i.z),
+      new Vec3(this.j.x, this.j.y, this.j.z), 
+      new Vec3(this.k.x, this.k.y, this.k.z)
+    );
+  }
+
+  /** Tested
+   * Получить кватернион из матрицы преобразования
+   */
+  getQuaternion(): Quaternion {
+    const scaling = this.getScaling();
+    const isx = 1 / scaling.x;
+    const isy = 1 / scaling.y;
+    const isz = 1 / scaling.z;
+    const sm11 = this.i.x * isx;
+    const sm12 = this.i.y * isy;
+    const sm13 = this.i.z * isz;
+    const sm21 = this.j.x * isx;
+    const sm22 = this.j.y * isy;
+    const sm23 = this.j.z * isz;
+    const sm31 = this.k.x * isx;
+    const sm32 = this.k.y * isy;
+    const sm33 = this.k.z * isz;
+    const trace = sm11 + sm22 + sm33;
+    var S = 0;
+
+    if (trace > 0) {
+      S = Math.sqrt(trace + 1.0) * 2;
+      return new Quaternion((sm23 - sm32)/S, (sm31 - sm13)/S, (sm12 - sm21)/S, 0.25*S);
+    } 
+    if (sm11 > sm22 && sm11 > sm33) {
+      S = Math.sqrt(1.0 + sm11 - sm22 - sm33) * 2;
+      return new Quaternion(0.25*S, (sm12 + sm21)/S, (sm31 + sm13)/S, (sm23 - sm32)/S);
+    } 
+    if (sm22 > sm33) {
+      S = Math.sqrt(1.0 + sm22 - sm11 - sm33) * 2;
+      return new Quaternion((sm12 + sm21)/S, 0.25*S, (sm23 + sm32)/S, (sm31 - sm13)/S);
+    }
+    S = Math.sqrt(1.0 + sm33 - sm11 - sm22) * 2;
+    return new Quaternion((sm31 + sm13)/S, (sm23 + sm32)/S, 0.25*S, (sm12 - sm21)/S);
+  }
+
+  /**
+   * Операция перемещения над матрицей на данный вектор смещения
+   * @param v - вектор смещения
+   */
+  translate(v: Vec3): Mat4 {
+    const a = this.copy();
+    a.l.x += a.i.x * v.x + a.j.x * v.y + a.k.x * v.z;
+    a.l.y += a.i.y * v.x + a.j.y * v.y + a.k.y * v.z;
+    a.l.z += a.i.z * v.x + a.j.z * v.y + a.k.z * v.z;
+    return a;
+  }
+  /**
+   * Получить матрицу после операции вращения над текущей матрицей
+   * @param axis - ось вращения
+   * @param rad - угол поворота
+   */
+  rotate(axis: Vec3, rad: number): Mat4 {
+    const v = axis.normalize();
+    const s = Math.sin(rad);
+    const c = Math.cos(rad);
+    const t = 1 - c;
+
+    const b00 = v.x * v.x * t + c;
+    const b01 = v.y * v.x * t + v.z * s;
+    const b02 = v.z * v.x * t - v.y * s;
+    const b10 = v.x * v.y * t - v.z * s;
+    const b11 = v.y * v.y * t + c;
+    const b12 = v.z * v.y * t + v.x * s;
+    const b20 = v.x * v.z * t + v.y * s;
+    const b21 = v.y * v.z * t - v.x * s;
+    const b22 = v.z * v.z * t + c;
+
+    return new Mat4(
+      new Vec4(
+        this.i.x*b00 + this.j.x*b01 + this.k.x*b02,
+        this.i.y*b00 + this.j.y*b01 + this.k.y*b02,
+        this.i.z*b00 + this.j.z*b01 + this.k.z*b02,
+        this.i.w*b00 + this.j.w*b01 + this.k.w*b02
+      ),
+      new Vec4(
+        this.i.x*b10 + this.j.x*b11 + this.k.x*b12,
+        this.i.y*b10 + this.j.y*b11 + this.k.y*b12,
+        this.i.z*b10 + this.j.z*b11 + this.k.z*b12,
+        this.i.w*b10 + this.j.w*b11 + this.k.w*b12
+      ),
+      new Vec4(
+        this.i.x*b20 + this.j.x*b21 + this.k.x*b22,
+        this.i.y*b20 + this.j.y*b21 + this.k.y*b22,
+        this.i.z*b20 + this.j.z*b21 + this.k.z*b22,
+        this.i.w*b20 + this.j.w*b21 + this.k.w*b22
+      ),
+      this.l.copy()
+    );
+  }
 }
 
 /****************************************************************************** 
@@ -500,9 +705,11 @@ export class Vec3 implements IVectors<Vec3> {
     return new Vec3(Math.exp(this.x), Math.exp(this.y), Math.exp(this.z));
   }
 
+  negate(): Vec3 { return new Vec3(-this.x, -this.y, -this.z); }
+
   getArray(): number[] { return [this.x, this.y, this.z]; }
 
-/** Векторное произведение */
+  /** Векторное произведение */
   cross(v: Vec3): Vec3 {
     return new Vec3(
       this.y*v.z - this.z*v.y,
@@ -510,6 +717,28 @@ export class Vec3 implements IVectors<Vec3> {
       this.x*v.y - this.y*v.x
     );
   }
+  /**
+   * Получить трансформированный вектор по кватерниону вращения
+   * @param q - кватернион
+   * @returns новый вектор после трансформации
+   */
+  transformQuat(q: Quaternion) {
+    const 
+      uvx = q.y * this.z - q.z * this.y,
+      uvy = q.z * this.x - q.x * this.z,
+      uvz = q.x * this.y - q.y * this.x;
+    const 
+      uuvx = q.y * uvz - q.z * uvy,
+      uuvy = q.z * uvx - q.x * uvz,
+      uuvz = q.x * uvy - q.y * uvx;
+    const w2 = q.w * 2;
+    return new Vec3(
+      this.x + w2*uvx + 2*uuvx,
+      this.y + w2*uvy + 2*uuvy,
+      this.z + w2*uvz + 2*uuvz
+    );
+  }
+
 }
 
 /****************************************************************************** 
@@ -603,14 +832,13 @@ export class Mat3 implements IMatrixes<Mat3, Vec3> {
       this.k.x, this.k.y, this.k.z
     ]
   }
-
   /**
    * Получить матрицу вращения
    * @param axis - ось вращения
    * @param theta - угол поворота
    * @returns 
    */
-  static rotateMat(axis: Vec3, theta: number): Mat3 {
+  static fromAxisAngle(axis: Vec3, theta: number): Mat3 {
     const a = axis.normalize();
     const c = Math.cos(theta);
     const mc = 1 - c;
@@ -620,7 +848,75 @@ export class Mat3 implements IMatrixes<Mat3, Vec3> {
       new Vec3(a.y*a.x*mc-a.z*s, a.y*a.y*mc+c, a.y*a.z*mc+a.x*s),
       new Vec3(a.z*a.x*mc+a.y*s, a.z*a.y*mc-a.x*s, a.z*a.z*mc+c)
     );
-  } 
+  }
+
+  /**
+   * Получить матрицу вращения из кватерниона
+   */
+  static fromQuat(q: Quaternion): Mat3 {
+    const x2 = q.x + q.x;
+    const y2 = q.y + q.y;
+    const z2 = q.z + q.z;
+    const xx = q.x * x2;
+    const yx = q.y * x2;
+    const yy = q.y * y2;
+    const zx = q.z * x2;
+    const zy = q.z * y2;
+    const zz = q.z * z2;
+    const wx = q.w * x2;
+    const wy = q.w * y2;
+    const wz = q.w * z2;
+    return new Mat3(
+      new Vec3(1 - yy - zz, yx + wz, zx - wy),
+      new Vec3(yx - wz, 1 - xx - zz, zy + wx),
+      new Vec3(zx + wy, zy - wx, 1 - xx - yy)
+    );
+  }
+  
+  /** Получить коэффициенты масштабирования из матрицы преобразования */
+  getScaling(): Vec3 {
+    return new Vec3(
+      Math.hypot(this.i.x, this.i.y, this.i.z),
+      Math.hypot(this.j.x, this.j.y, this.j.z), 
+      Math.hypot(this.k.x, this.k.y, this.k.z)
+    );
+  }
+
+  /**
+   * Получить кватернион из матрицы преобразования
+   */
+  getQuaternion(): Quaternion {
+    const scaling = this.getScaling();
+    const isx = 1 / scaling.x;
+    const isy = 1 / scaling.y;
+    const isz = 1 / scaling.z;
+    const sm11 = this.i.x * isx;
+    const sm12 = this.i.y * isy;
+    const sm13 = this.i.z * isz;
+    const sm21 = this.j.x * isx;
+    const sm22 = this.j.y * isy;
+    const sm23 = this.j.z * isz;
+    const sm31 = this.k.x * isx;
+    const sm32 = this.k.y * isy;
+    const sm33 = this.k.z * isz;
+    const trace = sm11 + sm22 + sm33;
+    var S = 0;
+
+    if (trace > 0) {
+      S = Math.sqrt(trace + 1.0) * 2;
+      return new Quaternion((sm23 - sm32)/S, (sm31 - sm13)/S, (sm12 - sm21)/S, 0.25*S);
+    } 
+    if (sm11 > sm22 && sm11 > sm33) {
+      S = Math.sqrt(1.0 + sm11 - sm22 - sm33) * 2;
+      return new Quaternion(0.25*S, (sm12 + sm21)/S, (sm31 + sm13)/S, (sm23 - sm32)/S);
+    } 
+    if (sm22 > sm33) {
+      S = Math.sqrt(1.0 + sm22 - sm11 - sm33) * 2;
+      return new Quaternion((sm12 + sm21)/S, 0.25*S, (sm23 + sm32)/S, (sm31 - sm13)/S);
+    }
+    S = Math.sqrt(1.0 + sm33 - sm11 - sm22) * 2;
+    return new Quaternion((sm31 + sm13)/S, (sm23 + sm32)/S, 0.25*S, (sm12 - sm21)/S);
+  }
 }
 
 /****************************************************************************** 
@@ -702,6 +998,8 @@ export class Vec2 implements IVectors<Vec2> {
   floor(): Vec2 { return new Vec2(Math.floor(this.x), Math.floor(this.y)); }
 
   fract(): Vec2 { return this.copy().subMutable(this.floor()); }
+
+  negate(): Vec2 { return new Vec2(-this.x, -this.y); }
 
   getArray(): number[] { return [this.x, this.y]; }
 
@@ -803,5 +1101,206 @@ export class Mat2 implements IMatrixes<Mat2, Vec2> {
     const c = Math.cos(rad);
     return new Mat2(new Vec2(c, s), new Vec2(-s, c));
   }
+}
 
+
+/** Класс определяющий операции с кватернионом */
+export class Quaternion extends Vec4 {
+
+  /** Кватернион не меняющий ориентацию */
+  static Identity = () => new Quaternion(0.,0.,0.,1.);
+
+  /** Представление в виде строки */
+  toStr() {
+    return `quat(${this.x.toFixed(3)}, ${this.y.toFixed(3)}, ${this.z.toFixed(3)}, ${this.w.toFixed(3)})`;
+  }
+
+  /** Иммутабельный обратный кватернион */
+  invert(): Quaternion {
+    const dot = this.dot(this);
+    const invDot = dot ? 1.0 / dot : 0;
+    return new Quaternion(-this.x, -this.y, -this.z, this.w).mulMutable(invDot) as Quaternion;
+  }
+
+  /** Иммутабельное произведение двух кватернионов */
+  qmul(q: Quaternion): Quaternion {
+    return new Quaternion(
+      this.w*q.x + this.x*q.w + this.y*q.z - this.z*q.y,
+      this.w*q.y + this.y*q.w + this.z*q.x - this.x*q.z,
+      this.w*q.z + this.z*q.w + this.x*q.y - this.y*q.x,
+      this.w*q.w - this.x*q.x - this.y*q.y - this.z*q.z
+    );
+  }
+
+  /** Вращение 3-мерного вектора в соответствии с ориентацией кватерниона */
+  rotate(v: Vec3): Vec3 {
+    const q = new Quaternion(v.x, v.y, v.z, 0.);
+    const r = this.qmul(q).qmul(this.invert());
+    return new Vec3(r.x, r.y, r.z);
+  }
+
+
+
+
+
+
+  /** Получить кватернион, соответствующий повороту вокруг оси axis на угол rad */
+  static fromAxisAngle(axis: Vec3, rad: number): Quaternion {
+    const a = 0.5*rad;
+    const p = axis.mul(Math.sin(a));
+    return new Quaternion(p.x, p.y, p.z, Math.cos(a));
+  }
+
+  /** Получить угол поворота кватерниона */
+  getAngle(): number { return Math.acos(this.w) * 2.; }
+
+  /** Получить ось вращения кватерниона */
+  getAxis(): Vec3 {
+    const rad = Math.acos(this.w) * 2.;
+    const s = Math.sin(0.5 * rad);
+    if (s > EPSILON) return new Vec3(this.x / s, this.y / s, this.z / s);
+    return Vec3.I();
+  }
+
+  /** Получить угол между текущим и заданным кватернионами */
+  getAngleDelta(q: Quaternion): number {
+    var dotproduct = this.dot(q);
+    return Math.acos(2 * dotproduct * dotproduct - 1);
+  }
+
+  /** Получить кватернион, полученный поворотом вокруг оси X на угол rad */
+  rotateX(rad: number): Quaternion {
+    rad *= 0.5;
+    var bx = Math.sin(rad), bw = Math.cos(rad);
+    return new Quaternion(
+      this.x * bw + this.w * bx,
+      this.y * bw + this.z * bx,
+      this.z * bw - this.y * bx,
+      this.w * bw - this.x * bx
+    );
+  }
+
+  /** Получить кватернион, полученный поворотом вокруг оси Y на угол rad */
+  rotateY(rad: number): Quaternion {
+    rad *= 0.5;
+    var by = Math.sin(rad), bw = Math.cos(rad);
+    return new Quaternion(
+      this.x * bw - this.z * by,
+      this.y * bw + this.w * by,
+      this.z * bw + this.x * by,
+      this.w * bw - this.y * by
+    );
+  }
+
+  /** Получить кватернион, полученный поворотом вокруг оси Z на угол rad */
+  rotateZ(rad: number): Quaternion {
+    rad *= 0.5;
+    var bz = Math.sin(rad), bw = Math.cos(rad);
+    return new Quaternion(
+      this.x * bw + this.y * bz,
+      this.y * bw - this.x * bz,
+      this.z * bw + this.w * bz,
+      this.w * bw - this.z * bz
+    );
+  }
+
+  /**
+   * Выполнить сферическую линейную интерполяцию между двумя кватернионами
+   * @param a - первый кватернион
+   * @param b - второй кватернион
+   * @param t - коэффициент интерполяции в диапазоне [0-1]
+   */
+  static slerp(a: Quaternion, b: Quaternion, t: number): Quaternion {
+    var omega, cosom, sinom, scale0, scale1; // calc cosine
+    var sign_cosom = 1;
+    cosom = a.dot(b);
+    if (cosom < 0.0) {
+      cosom = -cosom;
+      sign_cosom = -1;
+    }
+    if (1.0 - cosom > EPSILON) {
+      // standard case (slerp)
+      omega = Math.acos(cosom);
+      sinom = Math.sin(omega);
+      scale0 = Math.sin((1.0 - t) * omega) / sinom;
+      scale1 = Math.sin(t * omega) / sinom;
+    } else {
+      // "from" and "to" quaternions are very close
+      //  ... so we can do a linear interpolation
+      scale0 = 1.0 - t;
+      scale1 = t;
+    }
+    return a.mul(scale0).addMutable(b.mul(scale1*sign_cosom)) as Quaternion;
+  }
+
+  /** Получить случайный кватернион */
+  static random(): Quaternion {
+    var u1 = Math.random();
+    var u2 = Math.random();
+    var u3 = Math.random();
+    var sqrt1MinusU1 = Math.sqrt(1 - u1);
+    var sqrtU1 = Math.sqrt(u1);
+    return new Quaternion(
+      sqrt1MinusU1 * Math.sin(2.0 * Math.PI * u2),
+      sqrt1MinusU1 * Math.cos(2.0 * Math.PI * u2),
+      sqrtU1 * Math.sin(2.0 * Math.PI * u3),
+      sqrtU1 * Math.cos(2.0 * Math.PI * u3)
+    );
+  }
+
+  /**
+   * Сопряженный кватернион
+   * Для нормализованных кватернионов можно использовать вместо инвертирования, работает быстрее
+   */
+  conjugate(): Quaternion { return new Quaternion(-this.x, -this.y, -this.z, this.w); } 
+
+  /**
+   * Получить кватернион по заданным углам Эйлера x, y, z.
+   * @param x - угол поворота вокруг оси X в градусах
+   * @param y - угол поворота вокруг оси Y в градусах
+   * @param z - угол поворота вокруг оси Z в градусах
+   */
+  static fromEuler(x: number, y: number, z: number): Quaternion {
+    const halfToRad = 0.5 * Math.PI / 180.0;
+    x *= halfToRad;
+    y *= halfToRad;
+    z *= halfToRad;
+    const sx = Math.sin(x);
+    const cx = Math.cos(x);
+    const sy = Math.sin(y);
+    const cy = Math.cos(y);
+    const sz = Math.sin(z);
+    const cz = Math.cos(z);
+    return new Quaternion(
+      sx * cy * cz - cx * sy * sz,
+      cx * sy * cz + sx * cy * sz,
+      cx * cy * sz - sx * sy * cz,
+      cx * cy * cz + sx * sy * sz
+    );
+  }
+
+  /** Получить кватернион из матрицы преобразования */
+  static fromMat3(m: Mat3 | Mat4): Quaternion { return m.getQuaternion(); }
+  
+  /** Получить кватернион из направляющих точек вида */
+  static fromLookAt(from: Vec3, to: Vec3, up: Vec3): Quaternion {
+    return Mat4.lookAt(from, to, up).getQuaternion()
+  }
+
+
+
+
+
+
+  /** Кватернион, соответствующий повороту по трем осям на углы: Yaw, Pitch, Roll 
+   *  Roll - поворот вокруг продольной оси z (ось крена)
+   *  Pitch - поворот вокруг поперечной оси x (ось тангажа)
+   *  Yaw - поворот вокруг вертикальной оси y (ось рысканья)
+  */
+  static fromYawPitchRoll(yaw: number, pitch: number, roll: number): Quaternion {
+    return  Quaternion.fromAxisAngle(Vec3.I(), pitch)
+            .qmul(Quaternion.fromAxisAngle(Vec3.J(), yaw)
+            .qmul(Quaternion.fromAxisAngle(Vec3.K(), roll)))
+  }
+  
 }

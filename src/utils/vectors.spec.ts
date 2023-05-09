@@ -1,5 +1,5 @@
-import { Mat4, Vec3, Vec4 } from "./vectors";
-import { mat4, vec3 } from "gl-matrix";
+import { Mat3, Mat4, Quaternion, Vec3, Vec4 } from "./vectors";
+import { mat3, mat4, quat, vec3 } from "gl-matrix";
 
 type TestParameters = { name: string, arg: any }[]
 
@@ -27,12 +27,12 @@ function test(f: (...args: any[])=>void, args: TestParameters) {
   )
 }
 
-describe('Mat4.rotateMat', ()=>{
+describe('Mat4.fromAxisAngle', ()=>{
   for(let i = 0; i < 100; i++) {
     const axis = Vec3.RAND();
     const theta = Math.random()*100.;
     test((a: Vec3, t:number)=>{
-      const re = Mat4.rotateMat(a,t)
+      const re = Mat4.fromAxisAngle(a,t)
       const m = mat4.create();
       const v = vec3.create();
       vec3.set(v,a.x,a.y,a.z);
@@ -219,3 +219,59 @@ describe('Mat4.transpose', ()=>{
     ]);
   }
 })
+
+describe('Mat4.getQuaternion', ()=>{
+  for(let i = 0; i < 100; i++) {
+    const q1 = Quaternion.random();
+    const m1 = Mat4.fromQuat(q1);
+    test((m1: Mat4)=>{
+      const re = m1.getQuaternion();
+      const mt = mat4.create();
+      mat4.set(mt,
+        m1.i.x, m1.i.y, m1.i.z, m1.i.w,
+        m1.j.x, m1.j.y, m1.j.z, m1.j.w,
+        m1.k.x, m1.k.y, m1.k.z, m1.k.w,
+        m1.l.x, m1.l.y, m1.l.z, m1.l.w
+        );
+      const q = quat.create();
+      mat4.getRotation(q, mt);
+      const ex = new Quaternion(q[0],q[1],q[2],q[3]);
+      const equal = re.equals(ex);
+      expect(equal).toBeTrue();
+      //expect(re).toEqual(ex)
+    }, [
+      {name: 'Mat4', arg: m1}
+    ]);
+  }
+})
+
+
+describe('Quaternion.fromLookAt', ()=>{
+  for(let i = 0; i < 100; i++) {
+    const from = Vec3.RAND().mulMutable(100);
+    const to = Vec3.RAND().mulMutable(100);
+    const up = Vec3.RAND().normalize();
+    test((f: Vec3, t: Vec3, u: Vec3)=>{
+      const re = Quaternion.fromLookAt(f,t,u);
+      const m = mat4.create();
+      const from = vec3.create();
+      vec3.set(from, f.x, f.y, f.z);
+      const to = vec3.create();
+      vec3.set(to, t.x, t.y, t.z);
+      const up = vec3.create();
+      vec3.set(up, u.x, u.y, u.z);
+      mat4.lookAt(m,from,to,up);
+      const q = quat.create();
+      mat4.getRotation(q, m);
+      const ex = new Quaternion(q[0],q[1],q[2],q[3]);
+      const equal = re.equals(ex);
+      expect(equal).toBeTrue();
+      //expect(re).toEqual(ex)
+    }, [
+      {name: 'from', arg: from},
+      {name: 'to', arg: to},
+      {name: 'up', arg: up}
+    ]);
+  }
+})
+

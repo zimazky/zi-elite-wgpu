@@ -1,3 +1,4 @@
+const deg = Math.PI/180.;
 
 /** 
  * Функция гладкой ступени, значение x отображается на диапазон значений от 0. до 1.
@@ -17,6 +18,6 @@ export function mix(a: number, b: number, x: number): number {
 }
 
 /** Перевод из градусов в радианы */
-export function rad(x: number): number {
-  return Math.PI*x/180.;
+export function toRad(grad: number): number {
+  return grad*deg;
 }

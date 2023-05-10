@@ -1,5 +1,5 @@
 import { toRad } from "../utils/mathutils";
-import { isKeyPress, isKeyDown } from "../core/keyboard";
+import { isKeyPress, isKeyDown } from "../control/keyboard";
 import { Mat3, Mat4, Vec3, Quaternion } from '../utils/vectors';
 
 const GRAVITATION = 0.; //9.8; // ускорение свободного падения м/с2

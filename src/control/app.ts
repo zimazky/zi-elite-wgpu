@@ -1,4 +1,4 @@
-import { initKeyBuffer } from "../core/keyboard";
+import { initKeyBuffer } from "./keyboard";
 import { Scene } from "../model/scene";
 import { WebGPU } from "../view/webgpu";
 
